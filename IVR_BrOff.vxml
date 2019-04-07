@@ -1,0 +1,96 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<vxml version="2.1" xmlns="https://www.w3.org/TR/voicexml20/" xml:lang="ru-RU">
+<!-- IVR script  for ISR Cisco routers (CUBE) of branch office -->
+<!-- Pavel Stefanenko, p.stefanenko@gmail.com, 2016 -->
+
+<!-- Script variables -->
+<var name="Var_NumRcpt" expr="777"/> 	<!-- The Reception's phone number of branch office -->
+<var name="Var_NumDest" expr=""/>
+<var name="Var_NumPrefix" expr="'011'"/> 	<!-- The branch office number, necessarily in '' -->
+<var name="Var_NumRcptFinal" expr=""/>
+<var name="Var_NumDestFinal" expr=""/>
+<var name="Var_NumAttempts" expr="0"/> 
+<var name="Var_MaxAttempts" expr="2"/>	 <!-- Max number of attempts to enter an internal phone number -->
+<var name="Var_MsgWelcome" expr="'flash0:/ru_welcome_a.wav'"/> 	<!-- Welcome message -->
+<var name="Var_MsgEnDestNum" expr="'flash0:/ru_ent_dest_num_a.wav'"/> 	<!-- Message - Please enter employee's internal phone number -->
+<var name="Var_MsgInvOpt" expr="'flash0:/ru_inv_number_a.wav'"/> 	<!-- Message - Enterd phone number is invalid -->
+<var name="Var_MsgToRcpt" expr="'flash0:/ru_to_reception_a.wav'"/> 	<!-- Message - You will be redirected to the reception -->
+
+
+<form id="Form_Welcome" scope="dialog"> 	<!-- Welcome message -->
+	<block name="Block_Welcome">
+		<prompt bargein="true" count="1">
+			<audio expr="Var_MsgWelcome"/>
+		</prompt>
+	<goto next="#Form_GetNumDest"/>
+	</block>	
+</form>
+	
+<form id="Form_GetNumDest" scope="dialog">  	<!-- Getting an internal phone number -->
+	<property name="interdigittimeout" value="3s"/> <!--| -->
+	<property name="termtimeout" value="0s"/>		<!--| DTMF parameters -->
+	<property name="timeout" value="10s"/> 			<!--| -->
+		
+	<block name="Block_GetNumDestMsg"> 	<!-- Message please enter employee's internal phone number -->
+		<prompt bargein="true" count="1">
+			<audio expr="Var_MsgEnDestNum"/>
+		</prompt>
+		<assign name="Var_NumAttempts" expr="Var_NumAttempts+1"/>
+	</block>
+	
+	<field name="Field_GetDigits" type="digits?length=3"> 	<!-- Analysis of the entered digits -->
+		<grammar type="application/grammar+regex" mode="dtmf">
+			[7][0-9][0-9] 	<!-- We need to accept the phone numbers which started from "7" only -->
+		</grammar>
+				
+		<noinput> 	<!-- If there is no input, go to the forms Form_GotoNumRcpt -->
+			<log> !!!!++++ Destination phone Number wasn't inputted  ++++!!!! </log>
+			<goto next="#Form_GotoNumRcpt"/>
+		</noinput>
+		
+		<nomatch> 	<!-- In case of incorrect input, go to the form Form_InvOption -->
+			<log> !!!!++++ Destination phone Number wasn't recognize  ++++!!!! </log>
+			<goto next="#Form_InvOption"/>
+		</nomatch>
+	</field>
+	
+	<block name="Block_GetNumDestField">
+		<assign name="Var_NumDest" expr="Field_GetDigits"/>
+		<log> !!!!++++ The Destination phone Number was recognized ++++!!!! <value expr="Var_NumDest"/> </log>
+		<goto next="#Form_GotoNumDest"/>
+	</block>
+</form>
+	
+<form id="Form_GotoNumDest" scope="dialog"> 	<!-- Transfer to internal phone number -->
+	<block name="Block_GGotoNumDest">
+		<assign name="Var_NumDestFinal" expr="'phone://'+Var_NumPrefix+Var_NumDest"/>
+	</block>
+	<transfer connecttimeout="20s" destexpr="Var_NumDestFinal" bridge="false"> 
+	</transfer>
+</form>
+	
+<form id="Form_GotoNumRcpt"> 	<!-- Transfer to the reception phone number -->
+	<block name="Block_GotoNumRcpt">
+		<prompt bargein="false" count="1">
+				<audio expr="Var_MsgToRcpt"/>
+		</prompt>
+		<assign name="Var_NumRcptFinal" expr="'phone://'+Var_NumPrefix+Var_NumRcpt"/>
+	</block>
+	<transfer connecttimeout="20s" destexpr="Var_NumRcptFinal" bridge="false"> 
+	</transfer>
+</form>
+	
+<form id="Form_InvOption"> 	<!-- Message about the wrong input -->
+	<block name="Block_Welcome">
+		<if cond="Var_NumAttempts &lt; Var_MaxAttempts">
+			<prompt bargein="false" count="1">
+				<audio expr="Var_MsgInvOpt"/>
+			</prompt>
+			<goto next="#Form_GetNumDest"/>
+		<else />
+			<goto next="#Form_GotoNumRcpt"/> 	<!-- If the number of attempts is exhausted, but the entered phone number still wrong, then transfer to the reception phone number -->
+		</if>
+	</block>
+</form>
+
+</vxml>
